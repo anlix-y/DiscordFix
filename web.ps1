@@ -9,7 +9,7 @@ if (-not (Test-Path -Path $destinationFolder)) {
 
 function Check-DiscordStatus {
     try {
-        $response = Invoke-RestMethod -Uri 'https://discord.com/api/v9/gateway' -TimeoutSec 5
+        $response = Invoke-RestMethod -Uri 'https://discord.com/api/v9/gateway' -TimeoutSec 10
         if ($response) {
             Write-Host "Discord API is accessible."
             return $true
@@ -71,6 +71,89 @@ function FindAndRunBatFiles {
     Write-Host "Discord is not working correctly."
 }
 
+function Show-Menu {
+    param (
+        [switch]$ClearScreen = $true
+    )
+
+    if ($ClearScreen) {
+        Clear-Host
+    }
+
+    Write-Host "Выберите действие:"
+    Write-Host "1 - Авто настройка"
+    Write-Host "2 - Ручной выбор"
+    Write-Host "3 - Удалить из авто запуска"
+    Write-Host "4 - Снаять задачу"
+    Write-Host "0 - Выход"
+
+    $choice = Read-Host "Введите номер действия"
+
+    switch ($choice) {
+        1 {
+            Clear-Host
+            FindAndRunBatFiles
+        }
+        2 {
+            Clear-Host
+            Manual-Selection
+        }
+        3 {
+            Clear-Host
+            Remove-StartupShortcut
+        }
+        4 {
+            Clear-Host
+            Stop-WinwsProcess
+        }
+        0 {
+            exit
+        }
+        default {
+            Write-Host "Неверный выбор. Пожалуйста, попробуйте снова."
+            Show-Menu -ClearScreen $false
+        }
+    }
+}
+
+function Manual-Selection {
+    Write-Host "В разработке..."
+    # Здесь ваш код для ручного выбора
+}
+
+function Remove-StartupShortcut {
+    param (
+        [string]$shortcutName = "Start Winws DsFix1.lnk"
+    )
+
+    # Путь к папке автозапуска
+    $startupFolder = [System.IO.Path]::Combine($env:APPDATA, "Microsoft\Windows\Start Menu\Programs\Startup")
+
+    # Проверяем существование ярлыка
+    $shortcutPath = [System.IO.Path]::Combine($startupFolder, $shortcutName)
+    if (Test-Path -Path $shortcutPath) {
+        Remove-Item -Path $shortcutPath
+        Write-Host "Ярлык для автозапуска удален."
+    } else {
+        Write-Host "Ярлык для автозапуска не найден."
+    }
+    
+    Stop-WinwsProcess
+    # Пауза перед закрытием окна
+    Read-Host "Нажмите Enter для выхода..."
+}
+
+
+function Stop-WinwsProcess {
+    # Завершение процесса winws.exe
+    Get-Process -Name winws -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill() }
+
+    Write-Host "Процесс winws.exe завершен."
+
+    # Пауза перед закрытием окна
+    Read-Host "Нажмите Enter для выхода..."
+}
+
 # Function to download files and directories recursively
 function Download-Repository {
     param (
@@ -107,5 +190,5 @@ function Download-Repository {
 $repoURL = 'https://api.github.com/repos/Flowseal/zapret-discord-youtube/contents/'
 Download-Repository -repoURL $repoURL -destinationFolder $destinationFolder
 
-FindAndRunBatFiles
+Show-Menu
 
