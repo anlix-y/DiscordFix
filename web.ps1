@@ -7,39 +7,105 @@ if (-not (Test-Path -Path $destinationFolder)) {
     New-Item -ItemType Directory -Path $destinationFolder
 }
 
-# Download all files from https://github.com/Flowseal/zapret-discord-youtube
-$repoURL = 'https://api.github.com/repos/Flowseal/zapret-discord-youtube/contents/'
-$files = Invoke-RestMethod -Uri $repoURL
-
-foreach ($file in $files) {
-    if ($file.type -eq 'file') {
-        $downloadURL = $file.download_url
-        $fileName = $file.name
-        $filePath = Join-Path -Path $destinationFolder -ChildPath $fileName
-        try {
-            $response = Invoke-WebRequest -Uri $downloadURL -UseBasicParsing
-            Set-Content -Path $filePath -Value $response.Content
+function Check-DiscordStatus {
+    try {
+        $response = Invoke-RestMethod -Uri 'https://discord.com/api/v9/gateway' -TimeoutSec 5
+        if ($response) {
+            Write-Host "Discord API is accessible."
+            return $true
         }
-        catch {
-            Write-Warning "Failed to retrieve $downloadURL, skipping..."
+    } catch {
+        Write-Host "Error accessing Discord API: $_"
+        return $false
+    }
+    
+    Write-Host "Discord API returned status code: $($_.Exception.Response.StatusCode)"
+    return $false
+}
+
+function FindAndRunBatFiles {
+    # Указываем путь к директории DiscordFix
+    $directoryPath = "$env:APPDATA\DiscordFix"
+
+    # Проверяем, существует ли директория
+    if (-Not (Test-Path -Path $directoryPath)) {
+        Write-Host "Directory $directoryPath does not exist."
+        return
+    }
+
+    Write-Host "Searching for .bat files in ${directoryPath}"
+
+    # Получаем все файлы в указанной директории (без поддиректорий)
+    $allFiles = Get-ChildItem -Path $directoryPath -File
+
+    # Проверяем, найдены ли файлы
+    if ($allFiles.Count -eq 0) {
+        Write-Host "No files found in ${directoryPath}."
+        return
+    }
+
+    # Фильтруем .bat файлы
+    $batFiles = $allFiles | Where-Object { $_.Extension -eq '.bat' }
+
+    # Проверяем, найдены ли .bat файлы
+    if ($batFiles.Count -eq 0) {
+        Write-Host "No .bat files found in ${directoryPath}."
+        return
+    }
+
+    foreach ($file in $batFiles) {
+
+        # Читаем содержимое файла
+        $content = Get-Content -Path $file.FullName
+
+        # Проверяем, содержит ли файл слова "general" или "discord"
+        if (($content -match 'general' -or $content -match 'discord') -and -not ($content -match 'service')) {
+            "Running $($file.FullName)"
+
+            if (Check-DiscordStatus)
+            {
+                Write-Host "Discord is working correctly."
+            }
+        }
+    }
+    Write-Host "Discord is not working correctly."
+}
+
+# Function to download files and directories recursively
+function Download-Repository {
+    param (
+        [string]$repoURL,
+        [string]$destinationFolder
+    )
+
+    $files = Invoke-RestMethod -Uri $repoURL
+
+    foreach ($file in $files) {
+        if ($file.type -eq 'file') {
+            $downloadURL = $file.download_url
+            $fileName = $file.name
+            $filePath = Join-Path -Path $destinationFolder -ChildPath $fileName
+            try {
+                $response = Invoke-WebRequest -Uri $downloadURL -UseBasicParsing
+                Set-Content -Path $filePath -Value $response.Content
+            }
+            catch {
+                Write-Warning "Failed to retrieve $downloadURL, skipping..."
+            }
+        } elseif ($file.type -eq 'dir') {
+            $dirName = $file.name
+            $dirPath = Join-Path -Path $destinationFolder -ChildPath $dirName
+            if (-not (Test-Path -Path $dirPath)) {
+                New-Item -ItemType Directory -Path $dirPath
+            }
+            Download-Repository -repoURL $file.url -destinationFolder $dirPath
         }
     }
 }
 
-# Download script.ps1 from https://github.com/anlix-y/DiscordFix
-$scriptURL = 'https://raw.githubusercontent.com/anlix-y/DiscordFix/main/script.ps1'
-try {
-    $response = Invoke-WebRequest -Uri $scriptURL -UseBasicParsing
-    $scriptPath = Join-Path -Path $destinationFolder -ChildPath "script.ps1"
-    Set-Content -Path $scriptPath -Value $response.Content
-}
-catch {
-    Write-Warning "Failed to retrieve $scriptURL, skipping..."
-}
+# Download all files and directories from https://github.com/Flowseal/zapret-discord-youtube
+$repoURL = 'https://api.github.com/repos/Flowseal/zapret-discord-youtube/contents/'
+Download-Repository -repoURL $repoURL -destinationFolder $destinationFolder
 
-# Run script.ps1 if it exists
-if (Test-Path -Path $scriptPath) {
-    Start-Process powershell.exe -ArgumentList "-File `"$scriptPath`"" -Wait
-} else {
-    Write-Warning "script.ps1 not found, aborting!"
-}
+FindAndRunBatFiles
+
