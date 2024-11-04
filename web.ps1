@@ -32,6 +32,8 @@ function Check-DiscordStatus {
     return $false
 }
 
+
+
 function FindAndRunBatFiles {
     $directoryPath = "$env:APPDATA\DiscordFix"
 
@@ -92,7 +94,10 @@ function FindAndRunBatFiles {
                         $batFilePath = $file.FullName
                         $workingDirectory = Split-Path -Path $batFilePath
                         $taskName = "DiscordFix"
+                        $taskExists = schtasks /query /tn $taskName | Select-String -Pattern $taskName -Quiet
+                        if ($taskExists) {
                         schtasks /delete /tn $taskName /f 2>$null
+                        }
                         schtasks /create /tn $taskName /tr "`"$batFilePath`"" /sc onlogon /rl highest /f /it /ru System
                         Write-Host "Задача '$taskName' успешно добавлена в автозапуск."
                         Read-Host "Нажмите enter что бы продолжить..."
