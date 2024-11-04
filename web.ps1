@@ -12,6 +12,7 @@ if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Adm
 
 $destinationFolder = "$env:APPDATA\DiscordFix"
 if (-not (Test-Path -Path $destinationFolder)) {
+    Write-Host "Creating directory: $destinationFolder"
     New-Item -ItemType Directory -Path $destinationFolder
 }
 
@@ -244,6 +245,8 @@ function Stop-WinwsProcess {
 
 #! Функции работы с загрузкой
 
+
+
 function Download-File {
     param (
         [string]$Url,
@@ -259,8 +262,10 @@ function Remove-Directory {
         [string]$Path
     )
     if ([System.IO.Directory]::Exists($Path)) {
-        Write-Host "Deleting $Path"
+        Write-Host "Removing directory $Path"
         [System.IO.Directory]::Delete($Path, $true)
+    } else {
+        Write-Host "Directory $Path does not exist."
     }
 }
 
@@ -271,13 +276,11 @@ function Unzip-File {
     )
 
     $FilePath = Resolve-Path $File
-    $DestinationPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Destination)
-
-    If ($PSVersionTable.PSVersion.Major -ge 3) {
-        [System.IO.Compression.ZipFile]::ExtractToDirectory("$FilePath", "$DestinationPath")
-    }
-    else {
-        throw "Unzip-File is not supported on PowerShell versions less than 3.0"
+    if (Test-Path $FilePath) {
+        Write-Host "Unzipping $FilePath to $Destination"
+        Expand-Archive -Path $FilePath -DestinationPath $Destination -Force
+    } else {
+        Write-Host "File $FilePath not found."
     }
 }
 
@@ -287,11 +290,12 @@ function Move-DirectoryContent {
         [string]$Destination
     )
 
-    $SourcePath = Resolve-Path $Source
-    $DestinationPath = Resolve-Path $Destination
-
-    Write-Output "Moving content of $SourcePath to $DestinationPath"
-    Get-ChildItem -Path $SourcePath -Recurse | Move-Item -Destination $DestinationPath
+    if (Test-Path $Source) {
+        Write-Host "Moving content from $Source to $Destination"
+        Get-ChildItem -Path $Source -Recurse | Move-Item -Destination $Destination -Force
+    } else {
+        Write-Host "Source directory $Source does not exist."
+    }
 }
 
 function Start-install {
@@ -302,23 +306,32 @@ function Start-install {
     $DotfileTmpDir = $env:TEMP
     $SourceFile = Join-Path $DotfileTmpDir "zapret-discord-youtube.zip"
     $DestPath = "$env:APPDATA\DiscordFix"
-    # Скачивание репозитория
+
+    # Download the repository
+    Write-Host "Downloading repository..."
     Download-File "https://github.com/$UserName/$RepoName/archive/refs/heads/$Branch.zip" $SourceFile
 
-    # Удаление существующей папки назначения
-    Remove-Directory $DestPath
+    # Remove existing destination folder if it exists
+    if (Test-Path $DestPath) {
+        Write-Host "Removing existing directory..."
+        Remove-Directory $DestPath
+    }
 
-    # Распаковка архива
     Unzip-File $SourceFile $DestPath
 
-    # Путь к распакованной папке
     $ZipOutputDir = Join-Path $DestPath "$RepoName-$Branch"
 
-    # Перемещение содержимого распакованной папки в папку назначения
     Move-DirectoryContent $ZipOutputDir $DestPath
 
-    # Удаление временной папки
-    Remove-Directory $ZipOutputDir
+    # Remove the temporary folder after moving contents
+    if (Test-Path $ZipOutputDir) {
+        Write-Host "Removing extracted directory..."
+        Remove-Directory $ZipOutputDir
+    } else {
+        Write-Host "Extracted folder $ZipOutputDir not found."
+    }
+
+    Write-Host "Installation complete. Check $DestPath for files."
 }
 
 
