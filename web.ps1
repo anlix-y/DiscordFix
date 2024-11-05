@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "You do not have sufficient privileges. Please run the script as an administrator."
+    Read-Host "You do not have sufficient privileges. Please run the script as an administrator."
     exit
 }
 
